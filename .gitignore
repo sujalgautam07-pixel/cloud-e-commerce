@@ -1,0 +1,8 @@
+mingit/
+mingit.zip
+cloudflared.exe
+*.db
+__pycache__/
+*.pyc
+setup_mingit.py
+check_repo.py

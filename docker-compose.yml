@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  # Backend FastAPI Microservice
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ecommerce-backend
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=docker-compose
+      - CLOUD_TIER=Private Node (Local Docker)
+      - DATABASE_URL=sqlite:////app/data/ecommerce.db
+    volumes:
+      - ecommerce-data:/app/data
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - ecommerce-net
+
+  # Frontend Nginx Microservice
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ecommerce-frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - ecommerce-net
+
+networks:
+  ecommerce-net:
+    driver: bridge
+
+volumes:
+  ecommerce-data:
+    driver: local

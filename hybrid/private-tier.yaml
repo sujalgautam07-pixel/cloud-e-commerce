@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: private-core-db
+  namespace: ecommerce
+  labels:
+    tier: private-on-prem-core
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      tier: private-on-prem-core
+  template:
+    metadata:
+      labels:
+        tier: private-on-prem-core
+    spec:
+      containers:
+        - name: core-backend
+          image: ecommerce-backend:latest
+          env:
+            - name: ENVIRONMENT
+              value: "hybrid-private-local"
+            - name: CLOUD_TIER
+              value: "Private On-Premises Master Node"
+            - name: DATABASE_URL
+              value: "sqlite:////private/storage/secure_ecommerce.db"
+          ports:
+            - containerPort: 8000
+          volumeMounts:
+            - name: on-prem-encrypted-disk
+              mountPath: /private/storage
+      volumes:
+        - name: on-prem-encrypted-disk
+          persistentVolumeClaim:
+            claimName: private-on-prem-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: private-core-service
+  namespace: ecommerce
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: 8000
+  selector:
+    tier: private-on-prem-core
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: private-on-prem-pvc
+  namespace: ecommerce
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

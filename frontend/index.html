@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CloudMart | Cloud-Native Hybrid E-Commerce</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans">
+
+  <!-- TOP CLOUD METADATA BAR (HYBRID CLOUD / K8S OBSERVABILITY) -->
+  <div class="bg-slate-900 text-slate-300 text-xs py-1.5 px-4 flex flex-wrap justify-between items-center border-b border-slate-800">
+    <div class="flex items-center space-x-3">
+      <span class="flex h-2 w-2 relative">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+      </span>
+      <span class="font-semibold text-white tracking-wide">SYSTEM: ONLINE</span>
+      <span class="text-slate-500">|</span>
+      <span>Cluster: <span id="cloud-env" class="text-emerald-400 font-mono font-medium">Connecting...</span></span>
+      <span class="text-slate-500">|</span>
+      <span>Tier: <span id="cloud-tier" class="text-cyan-400 font-mono font-medium">Detecting...</span></span>
+    </div>
+    <div class="flex items-center space-x-3">
+      <span>Pod/Host: <span id="cloud-host" class="text-amber-400 font-mono">--</span></span>
+      <button onclick="fetchSystemInfo()" title="Refresh Pod Health" class="hover:text-white transition">
+        <i data-lucide="refresh-cw" class="w-3.5 h-3.5 inline"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- NAVIGATION BAR -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Logo -->
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="switchView('customer')">
+        <div class="bg-gradient-to-tr from-indigo-600 to-cyan-500 text-white p-2 rounded-xl shadow-md">
+          <i data-lucide="cloud" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <span class="text-xl font-bold bg-gradient-to-r from-indigo-600 to-cyan-600 bg-clip-text text-transparent">CloudMart</span>
+          <span class="text-xs block text-slate-400 font-medium">Hybrid Cloud E-Commerce</span>
+        </div>
+      </div>
+
+      <!-- Search & Category (Customer View Only) -->
+      <div id="customer-nav-controls" class="hidden md:flex items-center space-x-3 flex-1 max-w-md mx-8">
+        <div class="relative w-full">
+          <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+          <input 
+            type="text" 
+            id="search-input"
+            oninput="handleSearch(this.value)"
+            placeholder="Search products..." 
+            class="w-full pl-9 pr-4 py-2 text-sm bg-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"
+          />
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center space-x-4">
+        <!-- Track Order Button -->
+        <button 
+          onclick="openTrackModal()" 
+          class="text-sm text-slate-600 hover:text-indigo-600 font-medium flex items-center space-x-1 py-1.5 px-3 rounded-lg hover:bg-slate-100 transition"
+        >
+          <i data-lucide="package-search" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">Track Order</span>
+        </button>
+
+        <!-- Cart Button -->
+        <button 
+          id="cart-btn"
+          onclick="toggleCartModal()"
+          class="relative p-2 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition"
+        >
+          <i data-lucide="shopping-bag" class="w-5 h-5"></i>
+          <span id="cart-badge" class="absolute -top-1 -right-1 bg-indigo-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center ring-2 ring-white hidden">0</span>
+        </button>
+
+        <!-- Role Toggle (Customer vs Admin) -->
+        <div class="border-l border-slate-200 pl-4 flex items-center space-x-2">
+          <button 
+            id="view-toggle-btn"
+            onclick="toggleRole()"
+            class="text-xs font-semibold px-3 py-1.5 rounded-lg border flex items-center space-x-1.5 transition shadow-sm bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200"
+          >
+            <i data-lucide="shield" class="w-3.5 h-3.5"></i>
+            <span id="role-label">Switch to Admin</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- ================= CUSTOMER VIEW ================= -->
+    <div id="customer-view" class="space-y-8">
+      
+      <!-- Hero Banner -->
+      <div class="relative rounded-2xl overflow-hidden bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 text-white p-8 sm:p-12 shadow-xl">
+        <div class="relative z-10 max-w-2xl">
+          <span class="bg-indigo-500/30 text-indigo-200 text-xs font-semibold uppercase px-3 py-1 rounded-full border border-indigo-400/30">Cloud-Native Microservices</span>
+          <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight mt-4 leading-tight">
+            High Performance Online Store.
+          </h1>
+          <p class="mt-3 text-slate-300 text-sm sm:text-base">
+            Backed by containerized microservices and automated Kubernetes scaling across hybrid cloud infrastructure.
+          </p>
+        </div>
+        <div class="absolute right-0 top-0 bottom-0 w-1/3 opacity-20 pointer-events-none flex items-center justify-center">
+          <i data-lucide="layers" class="w-64 h-64 text-indigo-400"></i>
+        </div>
+      </div>
+
+      <!-- Category Filter Tabs -->
+      <div class="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none" id="category-tabs">
+        <button onclick="filterCategory('All')" class="cat-pill active px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white shadow-sm transition">All Products</button>
+        <button onclick="filterCategory('Laptops')" class="cat-pill px-4 py-2 rounded-xl text-xs font-semibold bg-white text-slate-600 border border-slate-200 hover:bg-slate-100 transition">Laptops</button>
+        <button onclick="filterCategory('Audio')" class="cat-pill px-4 py-2 rounded-xl text-xs font-semibold bg-white text-slate-600 border border-slate-200 hover:bg-slate-100 transition">Audio</button>
+        <button onclick="filterCategory('Peripherals')" class="cat-pill px-4 py-2 rounded-xl text-xs font-semibold bg-white text-slate-600 border border-slate-200 hover:bg-slate-100 transition">Peripherals</button>
+        <button onclick="filterCategory('Displays')" class="cat-pill px-4 py-2 rounded-xl text-xs font-semibold bg-white text-slate-600 border border-slate-200 hover:bg-slate-100 transition">Displays</button>
+        <button onclick="filterCategory('Smart Home')" class="cat-pill px-4 py-2 rounded-xl text-xs font-semibold bg-white text-slate-600 border border-slate-200 hover:bg-slate-100 transition">Smart Home</button>
+        <button onclick="filterCategory('Furniture')" class="cat-pill px-4 py-2 rounded-xl text-xs font-semibold bg-white text-slate-600 border border-slate-200 hover:bg-slate-100 transition">Furniture</button>
+      </div>
+
+      <!-- Products Grid -->
+      <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Dynamically populated by JS -->
+      </div>
+      
+      <!-- Empty State -->
+      <div id="no-products" class="hidden text-center py-16">
+        <i data-lucide="package-x" class="w-12 h-12 text-slate-400 mx-auto mb-3"></i>
+        <h3 class="text-base font-semibold text-slate-700">No products found</h3>
+        <p class="text-xs text-slate-500 mt-1">Try another category or search keyword.</p>
+      </div>
+    </div>
+
+
+    <!-- ================= ADMIN DASHBOARD VIEW ================= -->
+    <div id="admin-view" class="hidden space-y-8">
+      
+      <!-- Admin Header -->
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 pb-5">
+        <div>
+          <h2 class="text-2xl font-bold text-slate-900">Admin Control Center</h2>
+          <p class="text-sm text-slate-500">Monitor cloud metrics, manage product catalog, and process orders.</p>
+        </div>
+        <div class="flex space-x-3">
+          <button onclick="fetchAdminMetrics(); fetchAdminData();" class="px-3.5 py-2 text-xs font-semibold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center space-x-1.5 transition">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <span>Refresh</span>
+          </button>
+          <button onclick="openAddProductModal()" class="px-4 py-2 text-xs font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 flex items-center space-x-1.5 shadow-sm transition">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            <span>Add New Product</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Cloud / Store Metric Cards -->
+      <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-xs font-medium text-slate-500">Total Revenue</div>
+          <div id="metric-revenue" class="text-2xl font-bold text-slate-900 mt-1">$0.00</div>
+          <span class="text-[11px] text-emerald-600 font-medium">Live sync</span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-xs font-medium text-slate-500">Total Orders</div>
+          <div id="metric-orders" class="text-2xl font-bold text-slate-900 mt-1">0</div>
+          <span class="text-[11px] text-indigo-600 font-medium">Completed & pending</span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-xs font-medium text-slate-500">Catalog Size</div>
+          <div id="metric-products" class="text-2xl font-bold text-slate-900 mt-1">0</div>
+          <span class="text-[11px] text-slate-500">Active SKUs</span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-xs font-medium text-slate-500">Low Stock Alert</div>
+          <div id="metric-lowstock" class="text-2xl font-bold text-amber-600 mt-1">0</div>
+          <span class="text-[11px] text-amber-600 font-medium">&le; 5 units remaining</span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-xs font-medium text-slate-500">Pending Orders</div>
+          <div id="metric-pending" class="text-2xl font-bold text-cyan-600 mt-1">0</div>
+          <span class="text-[11px] text-cyan-600 font-medium">Needs fulfillment</span>
+        </div>
+      </div>
+
+      <!-- Admin Tabs: Inventory vs Orders -->
+      <div class="border-b border-slate-200">
+        <nav class="flex space-x-6">
+          <button id="tab-inventory-btn" onclick="switchAdminTab('inventory')" class="border-b-2 border-indigo-600 pb-3 text-sm font-semibold text-indigo-600 flex items-center space-x-2">
+            <i data-lucide="package" class="w-4 h-4"></i>
+            <span>Product Inventory</span>
+          </button>
+          <button id="tab-orders-btn" onclick="switchAdminTab('orders')" class="border-b-2 border-transparent pb-3 text-sm font-semibold text-slate-500 hover:text-slate-700 flex items-center space-x-2">
+            <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+            <span>Orders & Shipments</span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Products Inventory Table -->
+      <div id="admin-inventory-section" class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <th class="p-4">Item</th>
+                <th class="p-4">Category</th>
+                <th class="p-4">Price</th>
+                <th class="p-4">Stock Level</th>
+                <th class="p-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="admin-products-table" class="divide-y divide-slate-100">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Orders Management Table -->
+      <div id="admin-orders-section" class="hidden bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <th class="p-4">Order #</th>
+                <th class="p-4">Customer</th>
+                <th class="p-4">Items</th>
+                <th class="p-4">Total</th>
+                <th class="p-4">Status</th>
+                <th class="p-4 text-right">Update Status</th>
+              </tr>
+            </thead>
+            <tbody id="admin-orders-table" class="divide-y divide-slate-100">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ================= MODALS & DRAWERS ================= -->
+
+  <!-- CART DRAWER / MODAL -->
+  <div id="cart-modal" class="fixed inset-0 z-50 overflow-hidden hidden">
+    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onclick="toggleCartModal()"></div>
+    <div class="fixed inset-y-0 right-0 max-w-full flex pl-10">
+      <div class="w-screen max-w-md bg-white shadow-2xl flex flex-col">
+        <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="shopping-cart" class="w-5 h-5 text-indigo-600"></i>
+            <h3 class="text-lg font-bold text-slate-900">Your Cart</h3>
+          </div>
+          <button onclick="toggleCartModal()" class="text-slate-400 hover:text-slate-600 p-1">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div id="cart-items" class="flex-1 overflow-y-auto p-5 space-y-4">
+          <!-- Populated by JS -->
+        </div>
+
+        <div class="p-5 border-t border-slate-200 bg-slate-50 space-y-4">
+          <div class="space-y-1.5 text-xs text-slate-500">
+            <div class="flex justify-between">
+              <span>Subtotal:</span>
+              <span id="cart-subtotal" class="font-semibold text-slate-800">$0.00</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Cloud Tax (5%):</span>
+              <span id="cart-tax" class="font-semibold text-slate-800">$0.00</span>
+            </div>
+            <div class="flex justify-between text-base font-bold text-slate-900 pt-2 border-t border-slate-200">
+              <span>Total:</span>
+              <span id="cart-total" class="text-indigo-600">$0.00</span>
+            </div>
+          </div>
+          <button 
+            id="checkout-btn"
+            onclick="openCheckoutModal()" 
+            class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-sm shadow-md transition disabled:opacity-50"
+          >
+            Proceed to Checkout
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHECKOUT MODAL -->
+  <div id="checkout-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5">
+      <div class="flex justify-between items-center border-b border-slate-200 pb-3">
+        <h3 class="text-lg font-bold text-slate-900">Complete Your Order</h3>
+        <button onclick="closeCheckoutModal()" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="checkout-form" onsubmit="submitOrder(event)" class="space-y-4 text-sm">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+          <input type="text" id="cust-name" required placeholder="Alex Turner" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
+          <input type="email" id="cust-email" required placeholder="alex@university.edu" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Shipping Address</label>
+          <textarea id="cust-address" required rows="2" placeholder="Room 402, Campus Hostel / 123 Cloud St." class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+        </div>
+
+        <div class="bg-indigo-50 p-3 rounded-lg text-xs text-indigo-700 flex items-center space-x-2">
+          <i data-lucide="info" class="w-4 h-4 shrink-0"></i>
+          <span>Transactions are automatically processed and stored in the cloud cluster.</span>
+        </div>
+
+        <div class="flex justify-end space-x-3 pt-2">
+          <button type="button" onclick="closeCheckoutModal()" class="px-4 py-2 border rounded-lg text-slate-600 hover:bg-slate-100 font-medium">Cancel</button>
+          <button type="submit" id="submit-order-btn" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold shadow-sm transition">Place Order Now</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ORDER SUCCESS MODAL -->
+  <div id="order-success-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl text-center space-y-4">
+      <div class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+        <i data-lucide="check-circle" class="w-8 h-8"></i>
+      </div>
+      <h3 class="text-xl font-bold text-slate-900">Order Placed Successfully!</h3>
+      <p class="text-xs text-slate-500">Your order has been recorded in the cloud database.</p>
+      
+      <div class="bg-slate-100 p-3 rounded-xl border border-slate-200">
+        <div class="text-xs text-slate-500">Your Tracking Number:</div>
+        <div id="success-order-number" class="text-lg font-mono font-bold text-indigo-600 mt-0.5">ORD-XXXXXXXX</div>
+      </div>
+
+      <button onclick="closeSuccessModal()" class="w-full py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition">
+        Continue Shopping
+      </button>
+    </div>
+  </div>
+
+  <!-- TRACK ORDER MODAL -->
+  <div id="track-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5">
+      <div class="flex justify-between items-center border-b border-slate-200 pb-3">
+        <h3 class="text-lg font-bold text-slate-900">Track Order Status</h3>
+        <button onclick="closeTrackModal()" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="flex space-x-2">
+        <input type="text" id="track-order-input" placeholder="e.g. ORD-12A34B5C" class="flex-1 px-3 py-2 border rounded-lg text-sm uppercase font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+        <button onclick="searchOrder()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition">
+          Lookup
+        </button>
+      </div>
+
+      <div id="track-result" class="hidden border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-3">
+        <!-- Result populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ADD / EDIT PRODUCT MODAL (ADMIN) -->
+  <div id="product-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-200 pb-3">
+        <h3 id="product-modal-title" class="text-lg font-bold text-slate-900">Add New Product</h3>
+        <button onclick="closeProductModal()" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="product-form" onsubmit="saveProduct(event)" class="space-y-3 text-sm">
+        <input type="hidden" id="prod-id" />
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Product Title</label>
+          <input type="text" id="prod-title" required placeholder="Cloud SSD 1TB" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Category</label>
+            <select id="prod-category" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+              <option value="Laptops">Laptops</option>
+              <option value="Audio">Audio</option>
+              <option value="Peripherals">Peripherals</option>
+              <option value="Displays">Displays</option>
+              <option value="Smart Home">Smart Home</option>
+              <option value="Furniture">Furniture</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Price ($)</label>
+            <input type="number" step="0.01" id="prod-price" required placeholder="99.99" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Stock Quantity</label>
+            <input type="number" id="prod-stock" required min="0" placeholder="25" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Image URL</label>
+            <input type="url" id="prod-image" placeholder="https://..." class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Description</label>
+          <textarea id="prod-desc" rows="2" placeholder="Detailed product specifications..." class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+        </div>
+
+        <div class="flex justify-end space-x-2 pt-3">
+          <button type="button" onclick="closeProductModal()" class="px-4 py-2 border rounded-lg text-slate-600 hover:bg-slate-100 font-medium">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold shadow-sm transition">Save Product</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Notification Toast Container -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <div id="toast-body" class="bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center space-x-2 text-xs font-medium border border-slate-700">
+      <i data-lucide="info" class="w-4 h-4 text-indigo-400"></i>
+      <span id="toast-message">Notification</span>
+    </div>
+  </div>
+
+  <!-- JavaScript logic -->
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+services:
+  # CloudMart Web Service (Public Cloud Deployment)
+  - type: web
+    name: cloudmart-ecommerce
+    env: python
+    buildCommand: "cd backend && pip install -r requirements.txt"
+    startCommand: "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: ENVIRONMENT
+        value: public-cloud-render
+      - key: CLOUD_TIER
+        value: "Public Cloud (Render US-West)"
+      - key: DATABASE_URL
+        value: sqlite:///./ecommerce.db
